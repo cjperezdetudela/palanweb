@@ -120,11 +120,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Helper for HTTP/HTTPS requests
-function makeRequest(url, options = {}) {
+// Helper for HTTP/HTTPS requests with Redirect Support
+function makeRequest(url, options = {}, redirectCount = 0) {
   return new Promise((resolve, reject) => {
+    if (redirectCount > 5) return resolve({ statusCode: 508, data: null, raw: '' });
     const client = url.startsWith('https') ? https : http;
-    const req = client.request(url, options, (res) => {
+    const reqOptions = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        ...(options.headers || {})
+      },
+      method: options.method || 'GET'
+    };
+
+    const req = client.request(url, reqOptions, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = res.headers.location.startsWith('/')
+          ? new URL(url).origin + res.headers.location
+          : res.headers.location;
+        return makeRequest(redirectUrl, options, redirectCount + 1).then(resolve).catch(reject);
+      }
+
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
@@ -380,35 +397,45 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
     }
   }
 
-  // 3. Search and unlock EXCLUSIVELY Spanish / Castellano audio streams
+  // 3. Search and unlock audio streams (Prioritizing Spanish / Castellano)
   if (targetImdb) {
     try {
-      const streamUrl = `https://torrentio.strem.fun/language=spanish/stream/${isTv ? 'series' : 'movie'}/${targetImdb}${isTv ? `:${season || 1}:${episode || 1}` : ''}.json`;
-      const searchRes = await makeRequest(streamUrl);
+      const spanishUrl = `https://torrentio.strem.fun/language=spanish/stream/${isTv ? 'series' : 'movie'}/${targetImdb}${isTv ? `:${season || 1}:${episode || 1}` : ''}.json`;
+      const defaultUrl = `https://torrentio.strem.fun/stream/${isTv ? 'series' : 'movie'}/${targetImdb}${isTv ? `:${season || 1}:${episode || 1}` : ''}.json`;
 
-      if (searchRes.data && searchRes.data.streams && searchRes.data.streams.length > 0) {
+      let streams = [];
+      const searchResSp = await makeRequest(spanishUrl);
+      if (searchResSp.data && searchResSp.data.streams && searchResSp.data.streams.length > 0) {
+        streams = searchResSp.data.streams;
+      }
+
+      if (streams.length === 0) {
+        const searchResDef = await makeRequest(defaultUrl);
+        if (searchResDef.data && searchResDef.data.streams && searchResDef.data.streams.length > 0) {
+          streams = searchResDef.data.streams;
+        }
+      }
+
+      if (streams.length > 0) {
         const getStreamText = (st) => ((st.title || '') + ' ' + (st.name || '') + ' ' + (st.behaviorHints?.filename || '')).toLowerCase();
 
-        const pureCastellano = searchRes.data.streams.filter(st => {
+        // Priority 1: Castellano / Spanish audio tags
+        const castellanoStreams = streams.filter(st => {
           const txt = getStreamText(st);
-          const hasSpanishKeywords = /\[esp\]|castellano|español|lobezno|dontorrent|grantorrent|wolfmax4k|descargas2020|newpct|todotorrents|atomohd/i.test(txt);
-          const hasDualOrEnglish = /multi|dual|eng\b|english/i.test(txt);
-          return hasSpanishKeywords && !hasDualOrEnglish;
+          return /\[esp\]|castellano|español|lobezno|dontorrent|grantorrent|wolfmax4k|descargas2020|newpct|todotorrents|atomohd|spa\b|esp\b|spanish|spain|🇪🇸/i.test(txt);
         });
 
-        const multiAudio = searchRes.data.streams.filter(st => {
+        // Priority 2: Multi / Dual audio tags
+        const dualStreams = streams.filter(st => {
           const txt = getStreamText(st);
-          return /multi|dual|spa\b|esp\b|spanish|spain|🇪🇸/i.test(txt);
+          return /multi|dual/i.test(txt) && !castellanoStreams.includes(st);
         });
 
-        const sortedStreams = [...pureCastellano, ...multiAudio];
+        // Priority 3: Other available streams
+        const otherStreams = streams.filter(st => !castellanoStreams.includes(st) && !dualStreams.includes(st));
 
-        if (sortedStreams.length === 0) {
-          return res.status(404).json({
-            success: false,
-            message: '⚠️ Este contenido no está disponible en idioma Español / Castellano.'
-          });
-        }
+        // Prioritized streams: Castellano -> Dual -> Other
+        const sortedStreams = [...castellanoStreams, ...dualStreams, ...otherStreams];
 
         const uniqueStreams = [];
         const seenHashes = new Set();
@@ -419,7 +446,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
           }
         }
 
-        for (const st of uniqueStreams.slice(0, 10)) {
+        for (const st of uniqueStreams.slice(0, 15)) {
           if (st.infoHash) {
             const magnetUri = `magnet:?xt=urn:btih:${st.infoHash}&dn=${encodeURIComponent(title || 'Video')}`;
             const uploadUrl = `https://api.alldebrid.com/v4/magnet/upload?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&magnets[]=${encodeURIComponent(magnetUri)}`;
@@ -451,13 +478,13 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         }
       }
     } catch (err) {
-      console.error('Error resolviendo magnet en español para título:', err);
+      console.error('Error resolviendo magnet para título:', err);
     }
   }
 
   return res.status(404).json({
     success: false,
-    message: '⚠️ Este contenido no está disponible en idioma Español / Castellano.'
+    message: '⚠️ No se pudo desrestringir una fuente disponible para este título en AllDebrid. Verifica tu API Key o inténtalo de nuevo.'
   });
 });
 
