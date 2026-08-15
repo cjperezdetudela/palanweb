@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>PalanWeb - Streaming iOS & AllDebrid</title>
+  
+  <!-- iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PalanWeb">
+  <meta name="theme-color" content="#0b0f19">
+
+  <!-- Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/isometric-folders/512/play.png">
+
+  <!-- Typography & FontAwesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand" id="brandBtn">
+        <div class="brand-logo">
+          <i class="fa-solid fa-play"></i>
+        </div>
+        <div class="brand-text">
+          <h1>Palan<span>Web</span></h1>
+          <span class="brand-subtitle">iPhone Streaming Engine</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="user-badge hidden" id="userBadge">
+          <i class="fa-solid fa-user-shield text-accent"></i>
+          <span id="userBadgeText">admin</span>
+        </div>
+        <div class="debrid-badge disconnected" id="debridBadge">
+          <i class="fa-solid fa-bolt"></i>
+          <span id="debridBadgeText">Sin AllDebrid</span>
+        </div>
+        <button class="icon-btn" id="openSettingsBtn" title="Ajustes AllDebrid">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+        <button class="icon-btn hidden" id="logoutBtn" title="Cerrar Sesión">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Buscar película, serie, actor..." autocomplete="off">
+        <button class="clear-btn" id="clearSearchBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </section>
+
+    <!-- Navigation Pills -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active-gold" data-tab="top10">
+        <i class="fa-solid fa-trophy text-gold"></i> TOP 10 España
+      </button>
+      <button class="nav-tab" data-tab="justwatch">
+        <i class="fa-solid fa-fire-flame-curated text-gold"></i> JustWatch España
+      </button>
+      <button class="nav-tab" data-tab="palantir">
+        <i class="fa-solid fa-gem text-gold"></i> Palantir 3
+      </button>
+      <button class="nav-tab" data-tab="movies">
+        <i class="fa-solid fa-film"></i> Películas
+      </button>
+      <button class="nav-tab" data-tab="series">
+        <i class="fa-solid fa-tv"></i> Series
+      </button>
+      <button class="nav-tab" data-tab="tracking">
+        <i class="fa-solid fa-bookmark text-gold"></i> Seguimiento
+      </button>
+      <button class="nav-tab" data-tab="watchlist">
+        <i class="fa-solid fa-clock text-gold"></i> Pendientes
+      </button>
+      <button class="nav-tab" data-tab="direct">
+        <i class="fa-solid fa-link"></i> Enlace / Magnet
+      </button>
+    </nav>
+
+
+
+
+    <!-- TOP 10 ESPAÑA DEFAULT HOME VIEW -->
+    <div class="tab-content active" id="tabTop10">
+
+      <!-- Featured Hero Banner -->
+      <div class="hero-container" id="heroBanner">
+        <div class="hero-placeholder skeleton"></div>
+      </div>
+
+      <!-- TOP 10 PELÍCULAS MÁS VISTAS EN ESPAÑA -->
+      <section class="catalog-section" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-trophy text-gold"></i> TOP 10 Películas más Vistas en España</h2>
+          <span class="badge badge-accent">Plataformas Streaming</span>
+        </div>
+        <div class="media-grid" id="top10MoviesGrid">
+          <!-- Dynamically populated with Rank #1 to #10 badges -->
+        </div>
+      </section>
+
+      <!-- TOP 10 SERIES MÁS VISTAS EN ESPAÑA -->
+      <section class="catalog-section" style="margin-top: 28px;">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-tv text-accent"></i> TOP 10 Series más Vistas en España</h2>
+          <span class="badge badge-accent">Plataformas Streaming</span>
+        </div>
+        <div class="media-grid" id="top10SeriesGrid">
+          <!-- Dynamically populated with Rank #1 to #10 badges -->
+        </div>
+      </section>
+
+      <!-- EXCLUSIVO PRODUCCIONES DE ESPAÑA -->
+      <section class="catalog-section" style="margin-top: 28px;">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-flag text-gold"></i> Producción Española (Cine y Series de España)</h2>
+          <span class="badge badge-gold">🇪🇸 100% España</span>
+        </div>
+        <div class="media-grid" id="spainContentGrid">
+          <!-- Dynamically populated Spanish productions -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- JUSTWATCH ESPAÑA TAB CONTENT -->
+    <div class="tab-content" id="tabJustWatch">
+      <div class="palantir-hero glass-card" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%); border-color: rgba(245, 158, 11, 0.4);">
+        <div class="palantir-title-wrap">
+          <div class="palantir-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);"><i class="fa-solid fa-fire-flame-curated"></i></div>
+          <div>
+            <h2>JustWatch España</h2>
+            <p class="small-desc">Películas y series más populares en tiempo real en las principales plataformas de España (Netflix, Movistar+, HBO Max, Prime Video, Disney+).</p>
+          </div>
+        </div>
+
+        <!-- Provider Filter Bar -->
+        <div class="palantir-categories-grid" id="jwProvidersGrid">
+          <button class="palantir-cat-btn active" data-provider=""><i class="fa-solid fa-layer-group text-gold"></i> Todos los Proveedores</button>
+          <button class="palantir-cat-btn" data-provider="8"><i class="fa-solid fa-circle" style="color: #e50914;"></i> Netflix ES</button>
+          <button class="palantir-cat-btn" data-provider="119"><i class="fa-solid fa-circle" style="color: #00a8e1;"></i> Prime Video ES</button>
+          <button class="palantir-cat-btn" data-provider="384"><i class="fa-solid fa-circle" style="color: #993399;"></i> HBO Max ES</button>
+          <button class="palantir-cat-btn" data-provider="149"><i class="fa-solid fa-circle" style="color: #00569d;"></i> Movistar+ ES</button>
+          <button class="palantir-cat-btn" data-provider="337"><i class="fa-solid fa-circle" style="color: #113ccf;"></i> Disney+ ES</button>
+        </div>
+      </div>
+
+      <section class="catalog-section" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2 id="jwSectionTitle"><i class="fa-solid fa-fire text-gold"></i> Tendencias en España - JustWatch</h2>
+          <span class="badge badge-accent">30 Títulos Populares</span>
+        </div>
+        <div class="media-grid" id="justWatchGrid">
+          <!-- Dynamically populated with 30 items -->
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-content" id="tabPalantir">
+
+      <div class="palantir-hero glass-card">
+        <div class="palantir-title-wrap">
+          <div class="palantir-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <div>
+            <h2>Modo Palantir 3</h2>
+            <p class="small-desc">Accede a las categorías exclusivas, estrenos y cine 4K de Palantir 3 integrados con AllDebrid.</p>
+          </div>
+        </div>
+
+        <!-- Palantir Sub-Categories Bar -->
+        <div class="palantir-categories-grid" id="palantirCategoriesGrid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <section class="catalog-section" style="margin-top: 20px;">
+        <div class="section-header">
+          <h2 id="palantirSectionTitle"><i class="fa-solid fa-fire-flame-curated text-accent"></i> Palantir: Estrenos de Cine</h2>
+        </div>
+        <div class="media-grid" id="palantirGrid">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="tab-content" id="tabTrending">
+
+      <!-- Featured Hero Banner -->
+      <div class="hero-container" id="heroBanner">
+        <div class="hero-placeholder skeleton"></div>
+      </div>
+
+      <!-- Content Sections -->
+      <section class="catalog-section">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-wand-magic-sparkles text-accent"></i> Estrenos y Destacados</h2>
+        </div>
+        <div class="media-grid" id="trendingGrid">
+          <!-- Dynamically filled -->
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-content" id="tabMovies">
+      <section class="catalog-section">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-film text-accent"></i> Películas Populares</h2>
+        </div>
+        <div class="media-grid" id="moviesGrid">
+          <!-- Dynamically filled -->
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-content" id="tabSeries">
+      <section class="catalog-section">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-tv text-accent"></i> Series en Emisión</h2>
+        </div>
+        <div class="media-grid" id="seriesGrid">
+          <!-- Dynamically filled -->
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-content" id="tabTracking">
+      <section class="catalog-section">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-bookmark text-gold"></i> Series en Seguimiento</h2>
+          <span class="badge badge-accent" id="trackingCountBadge">0 series</span>
+        </div>
+        <p class="section-desc" style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 16px;">
+          Tus series guardadas. PalanWeb registra automáticamente qué capítulo viste por última vez y cuál es el siguiente episodio que te toca ver.
+        </p>
+        <div class="media-grid" id="trackingGrid">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+    </div>
+
+    <!-- PELÍCULAS Y SERIES PENDIENTES TAB CONTENT -->
+    <div class="tab-content" id="tabWatchlist">
+      <section class="catalog-section">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-clock text-gold"></i> Películas Pendientes de Ver</h2>
+          <span class="badge badge-accent" id="watchlistCountBadge">0 guardadas</span>
+        </div>
+        <p class="section-desc" style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 16px;">
+          Tu lista de películas y contenidos guardados para ver más tarde. Toca cualquiera para reproducirlo al instante en tu iPhone.
+        </p>
+        <div class="media-grid" id="watchlistGrid">
+          <!-- Dynamically populated pending items -->
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-content" id="tabDirect">
+
+
+      <section class="direct-link-section glass-card">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-bolt text-accent"></i> Reproducción Directa vía AllDebrid</h2>
+        </div>
+        <p class="section-desc">Pega cualquier enlace magnet o enlace de servidor compatible (Rapidgator, Mega, 1Fichier, etc.) para convertirlo en un streaming instantáneo en tu iPhone.</p>
+        
+        <div class="form-group">
+          <label for="directLinkInput">Enlace de Servidor o Magnet URI:</label>
+          <textarea id="directLinkInput" rows="3" placeholder="magnet:?xt=urn:btih:... o https://..."></textarea>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="resolveDirectBtn">
+          <i class="fa-solid fa-play"></i> Desbloquear y Reproducir
+        </button>
+
+        <div class="direct-result" id="directResult"></div>
+      </section>
+    </div>
+
+    <!-- Search Results View -->
+    <div class="search-results-view" id="searchResultsView">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-magnifying-glass text-accent"></i> Resultados de búsqueda</h2>
+        <span class="results-count" id="resultsCount">0 resultados</span>
+      </div>
+      <div class="media-grid" id="searchResultsGrid"></div>
+    </div>
+
+  </main>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-card glass-modal">
+      <button class="close-modal-btn" id="closeDetailBtn"><i class="fa-solid fa-xmark"></i></button>
+      
+      <div class="modal-backdrop-wrap">
+        <img id="modalBackdrop" src="" alt="Backdrop" class="modal-backdrop">
+        <div class="backdrop-gradient"></div>
+        <div class="modal-header-info">
+          <h2 id="modalTitle">Cargando...</h2>
+          <div class="modal-meta">
+            <span class="badge badge-accent" id="modalYear">2024</span>
+            <span class="badge badge-rating" id="modalRating"><i class="fa-solid fa-star"></i> 8.5</span>
+            <span class="badge badge-type" id="modalType">Película</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <p id="modalOverview" class="modal-overview"></p>
+
+        <!-- Toggle Watchlist Button for Movies & Shows -->
+        <button class="btn btn-outline" id="toggleWatchlistBtn" style="width: 100%; margin-bottom: 14px; font-size: 0.85rem;">
+          <i class="fa-solid fa-clock text-gold"></i> + Guardar en Pendientes
+        </button>
+
+
+        <!-- Episode Selector for TV Shows -->
+        <div class="tv-selector-container hidden" id="tvSelectorContainer">
+          <h3><i class="fa-solid fa-list-ol"></i> Seleccionar Episodio</h3>
+          <div class="selector-row" style="display: flex; gap: 8px; align-items: center; justify-content: space-between;">
+            <select id="seasonSelect" class="custom-select" style="flex: 1;">
+              <option value="1">Temporada 1</option>
+            </select>
+            <button class="btn btn-outline" id="toggleTrackBtn" style="white-space: nowrap; font-size: 0.8rem;">
+              <i class="fa-solid fa-bookmark text-gold"></i> Seguir Serie
+            </button>
+          </div>
+
+          <div class="episodes-list" id="episodesList">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Source / Resolve Stream Buttons -->
+        <div class="stream-actions">
+          <h3><i class="fa-solid fa-circle-play text-accent"></i> Opciones de Reproducción</h3>
+          <p class="small-text">Selecciona una opción para generar el enlace de alta velocidad con AllDebrid:</p>
+          
+          <div class="resolve-box glass-card">
+            <div class="custom-link-input-group">
+              <input type="text" id="customStreamLink" placeholder="Enlace o Magnet específico (opcional)">
+              <button class="btn btn-accent" id="resolveLinkBtn">
+                <i class="fa-solid fa-bolt"></i> Reproducir con AllDebrid
+              </button>
+            </div>
+            
+            <div class="quick-sources">
+              <span class="quick-source-label">Fuentes de búsqueda rápida:</span>
+              <div class="source-pills" id="sourcePills">
+                <!-- Auto generated pills for search -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO PLAYER MODAL / VIEW -->
+  <div class="player-overlay" id="playerOverlay">
+    <div class="player-container">
+      <div class="player-header">
+        <button class="back-btn" id="closePlayerBtn"><i class="fa-solid fa-arrow-left"></i> Volver</button>
+        <span class="player-title" id="playerTitle">Reproduciendo</span>
+      </div>
+
+      <!-- Prominent iPhone External Player Bar -->
+      <div class="player-external-options glass-card" style="margin: 12px 16px 4px;">
+        <h3 style="color: var(--accent-gold); margin-bottom: 6px;"><i class="fa-solid fa-mobile-screen-button"></i> Selecciona Reproductor en tu iPhone:</h3>
+        <p class="small-text" style="margin-bottom: 10px;">Para archivos MKV o 4K, utiliza <strong>Infuse</strong> o <strong>VLC</strong> (reproducción fluida en 1 tap sin esperas de carga en Safari):</p>
+        <div class="external-buttons-row">
+          <a href="#" id="openInfuseBtn" class="btn btn-primary"><i class="fa-solid fa-play"></i> 🚀 Abrir en Infuse</a>
+          <a href="#" id="openVlcBtn" class="btn btn-accent"><i class="fa-solid fa-cone"></i> 🟠 Abrir en VLC</a>
+          <button id="copyStreamUrlBtn" class="btn btn-outline"><i class="fa-solid fa-copy"></i> Copiar Enlace Directo</button>
+        </div>
+
+        <div style="margin-top: 12px; padding: 10px; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; font-size: 0.8rem; color: #fef08a;">
+          <strong>🇪🇸 Pista de Audio en Español:</strong> El archivo incluye audio en <strong>Español / Castellano</strong>. Si empieza a sonar en inglés, toca el icono de <strong>Audio / Idioma (🔊)</strong> en Infuse o VLC y elige <strong>Español</strong>.
+        </div>
+      </div>
+
+
+      <div class="video-wrapper">
+        <video id="webVideoPlayer" controls playsinline x-webkit-airplay="allow" webkit-playsinline></video>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ALLDEBRID SETTINGS MODAL -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card glass-modal settings-card">
+      <button class="close-modal-btn" id="closeSettingsBtn"><i class="fa-solid fa-xmark"></i></button>
+      
+      <h2><i class="fa-solid fa-bolt text-accent"></i> Configuración de AllDebrid</h2>
+      <p class="modal-desc">Ingresa tu clave API de AllDebrid para habilitar el desrestriccionado y la reproducción de enlaces en tu iPhone.</p>
+
+      <div class="form-group">
+        <label for="apikeyInput">API Key de AllDebrid:</label>
+        <input type="password" id="apikeyInput" placeholder="Pega tu API Key aquí...">
+        <small class="help-text">Puedes obtenerla en <a href="https://alldebrid.com/apikeys" target="_blank" rel="noopener">alldebrid.com/apikeys</a></small>
+      </div>
+
+      <div class="account-status-box" id="accountStatusBox">
+        <!-- Filled on check -->
+      </div>
+
+      <div class="modal-actions-row">
+        <button class="btn btn-primary" id="saveApikeyBtn"><i class="fa-solid fa-floppy-disk"></i> Guardar Key</button>
+        <button class="btn btn-outline" id="checkApikeyBtn"><i class="fa-solid fa-arrows-rotate"></i> Verificar</button>
+      </div>
+
+      <div class="settings-auth-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 8px;"><i class="fa-solid fa-user-shield text-accent"></i> Sesión Web Protegida</h3>
+        <p class="modal-desc" style="margin-bottom: 10px;">Acceso autenticado como: <strong id="settingsUsernameText" style="color: var(--accent-gold);">admin</strong></p>
+        <button class="btn btn-outline btn-small" id="settingsLogoutBtn" style="color: #f87171; border-color: rgba(248,113,113,0.3);">
+          <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión Web
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEB AUTH LOGIN MODAL -->
+  <div class="modal-overlay login-overlay" id="loginModal">
+    <div class="modal-card glass-modal login-card">
+      <div class="login-header">
+        <div class="login-icon">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h2>Acceso a <span>PalanWeb</span></h2>
+        <p class="modal-desc">Introduce tu usuario y contraseña para acceder al servicio de streaming.</p>
+      </div>
+
+      <form id="loginForm" autocomplete="on">
+        <div class="form-group">
+          <label for="loginUsername"><i class="fa-solid fa-user"></i> Usuario</label>
+          <input type="text" id="loginUsername" placeholder="Nombre de usuario" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword"><i class="fa-solid fa-key"></i> Contraseña</label>
+          <div class="password-input-wrapper">
+            <input type="password" id="loginPassword" placeholder="Contraseña" required autocomplete="current-password">
+            <button type="button" class="toggle-password-btn" id="togglePasswordBtn">
+              <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="login-error-msg hidden" id="loginErrorMsg">
+          <i class="fa-solid fa-circle-exclamation"></i> <span id="loginErrorText">Usuario o contraseña incorrectos</span>
+        </div>
+
+        <div class="modal-actions-row" style="margin-top: 20px;">
+          <button type="submit" class="btn btn-primary btn-block" id="submitLoginBtn">
+            <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- JavaScript -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

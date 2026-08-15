@@ -1,0 +1,17 @@
+{
+  "short_name": "PalanWeb",
+  "name": "PalanWeb - Kodi & AllDebrid Streamer",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/isometric-folders/512/play.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "display": "standalone",
+  "orientation": "portrait"
+}

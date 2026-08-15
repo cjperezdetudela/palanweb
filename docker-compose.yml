@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  palanweb:
+    build: .
+    container_name: palanweb_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - WEB_AUTH_REQUIRED=true
+      - WEB_USERNAME=admin
+      - WEB_PASSWORD=palanweb
+      - SESSION_SECRET=palanweb_secret_key_2026_servidor
+    # Opcional: cargar desde archivo .env existente
+    env_file:
+      - .env
