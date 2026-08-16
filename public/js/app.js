@@ -743,8 +743,8 @@ document.addEventListener('DOMContentLoaded', () => {
     streamsListContainer.innerHTML = '';
     streamsModal.classList.add('active');
 
-    const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : 'Reproducción en Directo';
-    const mediaType = state.currentMedia ? state.currentMedia.media_type : 'movie';
+    const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : (linkOrQuery || 'Reproducción en Directo');
+    const mediaType = state.currentMedia ? (state.currentMedia.media_type || (state.currentMedia.title ? 'movie' : 'tv')) : (linkOrQuery && (linkOrQuery.match(/S\d+E\d+/i) || linkOrQuery.match(/\d+x\d+/i)) ? 'tv' : 'movie');
     const isTv = mediaType === 'tv' || mediaType === 'series' || mediaType === 'show';
     const tmdbId = state.currentMedia ? state.currentMedia.id : null;
     let targetImdb = state.currentMedia ? (state.currentMedia.imdb_id || (state.currentMedia.external_ids ? state.currentMedia.external_ids.imdb_id : null)) : null;

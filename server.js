@@ -837,11 +837,10 @@ app.get('/api/catalog/search', async (req, res) => {
 // Fetch Stream Options for Palantir Stream Selector Modal
 app.post('/api/debrid/streams', async (req, res) => {
   const { title, type, season, episode, tmdbId, imdbId } = req.body;
-  const isTv = type === 'tv' || type === 'series' || type === 'show';
-  const mediaKind = isTv ? 'series' : 'movie';
-
+  let isTv = type === 'tv' || type === 'series' || type === 'show';
   let targetImdb = imdbId;
 
+  // 1. Resolve IMDb ID via TMDB ID
   if (!targetImdb && tmdbId) {
     try {
       const extUrl = `https://api.themoviedb.org/3/${isTv ? 'tv' : 'movie'}/${tmdbId}/external_ids?api_key=${TMDB_API_KEY}`;
@@ -852,14 +851,16 @@ app.post('/api/debrid/streams', async (req, res) => {
     } catch (e) {}
   }
 
+  // 2. Resolve IMDb ID via Title search if still missing
   if (!targetImdb && title) {
     try {
-      const cleanTitle = title.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
+      const cleanTitle = title.replace(/[ªº:.]/g, ' ').replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').replace(/\s+/g, ' ').trim();
       const sUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`;
       const sRes = await makeRequest(sUrl);
       if (sRes.data && sRes.data.results && sRes.data.results.length > 0) {
         const match = sRes.data.results[0];
-        const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
+        isTv = match.media_type === 'tv' || !!match.first_air_date;
+        const mType = isTv ? 'tv' : 'movie';
         const extUrl = `https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=${TMDB_API_KEY}`;
         const extRes = await makeRequest(extUrl);
         if (extRes.data && extRes.data.imdb_id) {
@@ -873,6 +874,7 @@ app.post('/api/debrid/streams', async (req, res) => {
     return res.json({ success: false, message: 'No se pudo obtener la ID del contenido', streams: [] });
   }
 
+  const mediaKind = isTv ? 'series' : 'movie';
   const epSuffix = isTv ? `:${season || 1}:${episode || 1}` : '';
   const mirrors = [
     `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
@@ -880,16 +882,21 @@ app.post('/api/debrid/streams', async (req, res) => {
     `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
   ];
 
-  let rawStreams = [];
-  for (const mUrl of mirrors) {
-    try {
-      const response = await makeRequest(mUrl);
-      if (response.data && response.data.streams && response.data.streams.length > 0) {
-        rawStreams = response.data.streams;
-        break;
-      }
-    } catch (e) {}
-  }
+  // Fetch from all mirrors simultaneously in parallel (fast 6s timeout)
+  const responses = await Promise.all(mirrors.map(mUrl => makeRequest(mUrl, { timeout: 6000 })));
+
+  const rawStreamsMap = new Map();
+  responses.forEach(response => {
+    if (response.data && response.data.streams && Array.isArray(response.data.streams)) {
+      response.data.streams.forEach(st => {
+        if (st.infoHash && !rawStreamsMap.has(st.infoHash)) {
+          rawStreamsMap.set(st.infoHash, st);
+        }
+      });
+    }
+  });
+
+  const rawStreams = Array.from(rawStreamsMap.values());
 
   if (rawStreams.length === 0) {
     return res.json({ success: false, message: 'No se encontraron fuentes disponibles', streams: [] });
