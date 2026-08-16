@@ -276,19 +276,24 @@ app.post('/api/debrid/magnet', async (req, res) => {
   }
 });
 
-// Helper to find exact episode file in multi-episode torrents
-function findEpisodeFile(filesArray, seasonNum, episodeNum) {
-  if (!filesArray || !Array.isArray(filesArray)) return null;
-
-  const allFiles = [];
-  filesArray.forEach(folder => {
-    if (folder.e && Array.isArray(folder.e)) {
-      allFiles.push(...folder.e);
-    } else if (folder.n && folder.l) {
-      allFiles.push(folder);
+// Helper to recursively flatten file tree from torrent status
+function flattenFiles(filesArray) {
+  if (!filesArray || !Array.isArray(filesArray)) return [];
+  const result = [];
+  filesArray.forEach(item => {
+    if (item.l && item.n) {
+      result.push(item);
+    }
+    if (item.e && Array.isArray(item.e)) {
+      result.push(...flattenFiles(item.e));
     }
   });
+  return result;
+}
 
+// Helper to find exact episode file in multi-episode torrents
+function findEpisodeFile(filesArray, seasonNum, episodeNum) {
+  const allFiles = flattenFiles(filesArray);
   if (allFiles.length === 0) return null;
 
   const sStr = String(seasonNum).padStart(2, '0');
@@ -318,23 +323,17 @@ function findEpisodeFile(filesArray, seasonNum, episodeNum) {
 }
 
 function findMovieVideoFile(filesArray) {
-  if (!filesArray || !Array.isArray(filesArray)) return null;
-  const allFiles = [];
-  filesArray.forEach(folder => {
-    if (folder.e && Array.isArray(folder.e)) {
-      allFiles.push(...folder.e);
-    } else if (folder.n && folder.l) {
-      allFiles.push(folder);
-    }
-  });
-
+  const allFiles = flattenFiles(filesArray);
   const videoFiles = allFiles.filter(f => f.n && f.n.match(/\.(mp4|mkv|avi|mov|m4v)$/i));
   return videoFiles.length > 0 ? videoFiles[0] : allFiles[0];
 }
 
+const DEFAULT_ALLDEBRID_KEY = process.env.ALLDEBRID_API_KEY || 'xSk7D1sWYiGGNnUJwt7s';
+
 // Smart Auto-Resolver Endpoint for Movies & Episodes
 app.post('/api/debrid/smart-resolve', async (req, res) => {
-  const apikey = req.headers['x-apikey'] || req.body.apikey;
+  const clientKey = req.headers['x-apikey'] || req.body.apikey;
+  const apikey = (clientKey && clientKey.trim()) ? clientKey.trim() : DEFAULT_ALLDEBRID_KEY;
   const { title, query, link, type, season, episode, imdbId, tmdbId } = req.body;
   const isTv = type === 'tv';
   const targetLink = link || query;
