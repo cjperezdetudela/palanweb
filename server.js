@@ -5,6 +5,7 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -145,9 +146,19 @@ function makeRequest(url, options = {}, redirectCount = 0) {
         return makeRequest(redirectUrl, options, redirectCount + 1).then(resolve).catch(reject);
       }
 
+      let stream = res;
+      const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+      if (encoding === 'gzip') {
+        stream = res.pipe(zlib.createGunzip());
+      } else if (encoding === 'deflate') {
+        stream = res.pipe(zlib.createInflate());
+      } else if (encoding === 'br') {
+        stream = res.pipe(zlib.createBrotliDecompress());
+      }
+
       let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
+      stream.on('data', (chunk) => (data += chunk));
+      stream.on('end', () => {
         try {
           const parsed = JSON.parse(data);
           resolve({ statusCode: res.statusCode, data: parsed, raw: data });
