@@ -795,19 +795,32 @@ app.get('/api/catalog/justwatch', async (req, res) => {
 
 // Proxy TMDB Search
 app.get('/api/catalog/search', async (req, res) => {
-
-  const query = req.query.q;
+  const query = (req.query.q || '').trim();
   if (!query) return res.json({ success: true, results: [] });
 
   try {
-    const url = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(query)}&page=1`;
-    const response = await makeRequest(url);
+    const cleanQuery = query.replace(/[ªº:.]/g, ' ').replace(/\s+/g, ' ').trim();
 
-    if (response.data && response.data.results && response.data.results.length > 0) {
-      const filtered = response.data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
-      return res.json({ success: true, results: filtered });
+    const [rawRes, cleanRes] = await Promise.all([
+      makeRequest(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(query)}&page=1`),
+      makeRequest(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(cleanQuery)}&page=1`)
+    ]);
+
+    const items1 = (rawRes.data && rawRes.data.results) ? rawRes.data.results : [];
+    const items2 = (cleanRes.data && cleanRes.data.results) ? cleanRes.data.results : [];
+
+    const combinedMap = new Map();
+    [...items1, ...items2].forEach(item => {
+      if ((item.media_type === 'movie' || item.media_type === 'tv') && !combinedMap.has(item.id)) {
+        combinedMap.set(item.id, item);
+      }
+    });
+
+    const results = Array.from(combinedMap.values());
+    if (results.length > 0) {
+      return res.json({ success: true, results: results });
     }
-    
+
     const matched = FALLBACK_CATALOG.filter(item => 
       (item.title || item.name || '').toLowerCase().includes(query.toLowerCase())
     );
