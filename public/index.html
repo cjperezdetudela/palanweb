@@ -483,10 +483,29 @@
     </div>
   </div>
 
+  <!-- Palantir Stream Selector Modal -->
+  <div class="modal-overlay" id="streamsModal">
+    <div class="modal-container" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--accent-gold);" id="streamsModalTitle">
+          <i class="fa-solid fa-list-ul"></i> Selecciona la Fuente de Vídeo
+        </h3>
+        <button class="modal-close-btn" id="closeStreamsBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div id="streamsListLoading" style="text-align: center; padding: 30px; color: #94a3b8;">
+          <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent-gold); margin-bottom: 10px;"></i>
+          <p style="font-size: 0.9rem;">Obteniendo opciones de calidad y audio desde la nube...</p>
+        </div>
+        <div id="streamsListContainer" class="streams-list hidden"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- JavaScript -->
-  <script src="/js/app.js?v=20260816_v13"></script>
+  <script src="/js/app.js?v=20260816_v14"></script>
 </body>
 </html>

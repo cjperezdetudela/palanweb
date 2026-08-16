@@ -687,9 +687,180 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // -------------------------------------------------------------
+  // PALANTIR-STYLE STREAM SELECTOR MODAL
+  // -------------------------------------------------------------
+  function parseStreamMetadata(st) {
+    const title = (st.title || '') + ' ' + (st.name || '') + ' ' + (st.behaviorHints?.filename || '');
+    const txt = title.toLowerCase();
+
+    // Quality
+    let quality = 'HD';
+    if (/2160p|4k|uhd/i.test(txt)) quality = '4K UHD';
+    else if (/1080p|fhd/i.test(txt)) quality = '1080p';
+    else if (/720p/i.test(txt)) quality = '720p';
+    else if (/480p|dvdrip|sd/i.test(txt)) quality = '480p';
+
+    // Audio / Language
+    let audio = '🇬🇧 Inglés / VOS';
+    if (/\[esp\]|castellano|español|lobezno|dontorrent|grantorrent|wolfmax4k|descargas2020|newpct|todotorrents|atomohd|spa\b|esp\b|spanish|spain|🇪🇸/i.test(txt)) {
+      audio = '🇪🇸 Castellano';
+    } else if (/latino|lat\b|🇲🇽/i.test(txt)) {
+      audio = '🇲🇽 Latino';
+    } else if (/multi|dual/i.test(txt)) {
+      audio = '🌐 Multi-Audio';
+    }
+
+    // Size
+    const sizeMatch = title.match(/💾\s*([\d\.]+\s*(?:GB|MB))/i) || title.match(/([\d\.]+\s*(?:GB|MB))/i);
+    const size = sizeMatch ? sizeMatch[1] : '';
+
+    // Source / Provider
+    const providerMatch = title.match(/⚙️\s*([^\n\r]+)/) || title.match(/([A-Za-z0-9]+Torrent[A-Za-z0-9]*|1337x|RARBG|TorrentGalaxy|EZTV|ThePirateBay)/i);
+    const provider = providerMatch ? providerMatch[1].trim() : 'Torrent';
+
+    return {
+      quality,
+      audio,
+      size,
+      provider,
+      rawTitle: st.title || st.name || 'Enlace Torrent',
+      infoHash: st.infoHash,
+      stream: st
+    };
+  }
+
+  async function openStreamsSelectorModal(displayTitle, linkOrQuery) {
+    const streamsModal = document.getElementById('streamsModal');
+    const streamsModalTitle = document.getElementById('streamsModalTitle');
+    const streamsListLoading = document.getElementById('streamsListLoading');
+    const streamsListContainer = document.getElementById('streamsListContainer');
+
+    if (!streamsModal) return false;
+
+    streamsModalTitle.innerHTML = `<i class="fa-solid fa-list-ul"></i> Fuentes para: ${displayTitle}`;
+    streamsListLoading.classList.remove('hidden');
+    streamsListContainer.classList.add('hidden');
+    streamsListContainer.innerHTML = '';
+    streamsModal.classList.add('active');
+
+    const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : 'Reproducción en Directo';
+    const mediaType = state.currentMedia ? state.currentMedia.media_type : 'movie';
+    const isTv = mediaType === 'tv' || mediaType === 'series' || mediaType === 'show';
+    const mediaKind = isTv ? 'series' : 'movie';
+    const tmdbId = state.currentMedia ? state.currentMedia.id : null;
+
+    let targetImdb = state.currentMedia ? (state.currentMedia.imdb_id || (state.currentMedia.external_ids ? state.currentMedia.external_ids.imdb_id : null)) : null;
+
+    // Fetch IMDb ID if missing
+    if (!targetImdb && tmdbId) {
+      try {
+        const extRes = await fetch(`/api/catalog/details/${isTv ? 'tv' : 'movie'}/${tmdbId}`);
+        const extData = await extRes.json();
+        if (extData.success && extData.details) {
+          targetImdb = extData.details.imdb_id || (extData.details.external_ids ? extData.details.external_ids.imdb_id : null);
+        }
+      } catch (e) {}
+    }
+
+    // Search TMDB by title if IMDb ID still missing
+    if (!targetImdb && mediaTitle) {
+      try {
+        const cleanTitle = mediaTitle.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
+        const sRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=8476a7ab80ad76f0936744df0430e67c&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`);
+        const sData = await sRes.json();
+        if (sData && sData.results && sData.results.length > 0) {
+          const match = sData.results[0];
+          const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
+          const extRes = await fetch(`https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=8476a7ab80ad76f0936744df0430e67c`);
+          const extData = await extRes.json();
+          if (extData && extData.imdb_id) {
+            targetImdb = extData.imdb_id;
+          }
+        }
+      } catch (e) {}
+    }
+
+    let allStreams = [];
+    if (targetImdb) {
+      const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
+      const clientMirrors = [
+        `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+      ];
+
+      for (const cUrl of clientMirrors) {
+        try {
+          const tRes = await fetch(cUrl);
+          const tData = await tRes.json();
+          if (tData && tData.streams && tData.streams.length > 0) {
+            allStreams = tData.streams;
+            console.log(`[client] Found ${allStreams.length} streams from Torrentio mirror: ${cUrl}`);
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+
+    streamsListLoading.classList.add('hidden');
+    streamsListContainer.classList.remove('hidden');
+
+    if (allStreams.length === 0) {
+      streamsListContainer.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #94a3b8;">
+          <p>No se encontraron opciones múltiples. Intentando desrestricción directa...</p>
+        </div>
+      `;
+      setTimeout(() => {
+        streamsModal.classList.remove('active');
+        resolveAndPlayLink(linkOrQuery, null, true);
+      }, 1000);
+      return;
+    }
+
+    const parsedStreams = allStreams.map(parseStreamMetadata);
+
+    // Group & Sort: Castellano -> Multi -> Latino -> VOS
+    const castellano = parsedStreams.filter(p => p.audio.includes('Castellano'));
+    const multi = parsedStreams.filter(p => p.audio.includes('Multi'));
+    const latino = parsedStreams.filter(p => p.audio.includes('Latino'));
+    const others = parsedStreams.filter(p => !castellano.includes(p) && !multi.includes(p) && !latino.includes(p));
+
+    const sortedStreams = [...castellano, ...multi, ...latino, ...others];
+
+    sortedStreams.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'stream-option-card';
+      card.innerHTML = `
+        <div>
+          <div class="stream-badges">
+            <span class="badge-quality">${item.quality}</span>
+            <span class="badge-audio">${item.audio}</span>
+            ${item.size ? `<span class="badge-size">💾 ${item.size}</span>` : ''}
+          </div>
+          <div class="stream-provider-name" style="margin-top: 6px; font-size: 0.78rem;">
+            Fuente: ${item.provider}
+          </div>
+        </div>
+        <button class="btn btn-accent" style="padding: 6px 12px; font-size: 0.75rem; shrink: 0;">
+          <i class="fa-solid fa-play"></i> Reproducir
+        </button>
+      `;
+
+      card.addEventListener('click', () => {
+        streamsModal.classList.remove('active');
+        showToast(`Cargando opción #${index + 1} (${item.quality} ${item.audio})...`, 'info');
+        resolveAndPlayLink(linkOrQuery, [item.stream], true);
+      });
+
+      streamsListContainer.appendChild(card);
+    });
+  }
+
+  // -------------------------------------------------------------
   // STREAM RESOLVER & ALLDEBRID UNLOCK
   // -------------------------------------------------------------
-  async function resolveAndPlayLink(linkOrQuery) {
+  async function resolveAndPlayLink(linkOrQuery, specificStreams = null, bypassModal = false) {
     if (!state.apiKey) {
       showToast('Sin API Key de AllDebrid. Intentando reproducir directo/prueba.', 'warning');
     }
@@ -700,7 +871,22 @@ document.addEventListener('DOMContentLoaded', () => {
           : (state.currentMedia.title || state.currentMedia.name))
       : 'Reproducción en Directo';
 
-    showToast(`Resolviendo enlace para ${displayTitle}...`, 'success');
+    // Parse season & episode from linkOrQuery string if present (e.g. S01E02 or 1x02)
+    if (typeof linkOrQuery === 'string') {
+      const sMatch = linkOrQuery.match(/S(\d+)E(\d+)/i) || linkOrQuery.match(/(\d+)x(\d+)/i);
+      if (sMatch) {
+        state.selectedSeason = parseInt(sMatch[1], 10);
+        state.selectedEpisode = parseInt(sMatch[2], 10);
+      }
+    }
+
+    // If not bypassing modal and not direct link: open Palantir Stream Selector Modal!
+    if (!bypassModal && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
+      openStreamsSelectorModal(displayTitle, linkOrQuery);
+      return;
+    }
+
+    showToast(`Desrestringiendo enlace para ${displayTitle}...`, 'success');
 
     try {
       const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : 'Reproducción en Directo';
@@ -709,70 +895,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const mediaKind = isTv ? 'series' : 'movie';
       const tmdbId = state.currentMedia ? state.currentMedia.id : null;
 
-      let clientStreams = [];
+      let clientStreams = specificStreams || [];
       let targetImdb = state.currentMedia ? (state.currentMedia.imdb_id || (state.currentMedia.external_ids ? state.currentMedia.external_ids.imdb_id : null)) : null;
-
-      // Fetch IMDb ID if missing and tmdbId exists
-      if (!targetImdb && tmdbId) {
-        try {
-          const extRes = await fetch(`/api/catalog/details/${isTv ? 'tv' : 'movie'}/${tmdbId}`);
-          const extData = await extRes.json();
-          if (extData.success && extData.details) {
-            targetImdb = extData.details.imdb_id || (extData.details.external_ids ? extData.details.external_ids.imdb_id : null);
-          }
-        } catch (e) {}
-      }
-
-      // Search TMDB by text title if IMDb ID still missing
-      if (!targetImdb && mediaTitle) {
-        try {
-          const cleanTitle = mediaTitle.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
-          const sRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=8476a7ab80ad76f0936744df0430e67c&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`);
-          const sData = await sRes.json();
-          if (sData && sData.results && sData.results.length > 0) {
-            const match = sData.results[0];
-            const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
-            const extRes = await fetch(`https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=8476a7ab80ad76f0936744df0430e67c`);
-            const extData = await extRes.json();
-            if (extData && extData.imdb_id) {
-              targetImdb = extData.imdb_id;
-            }
-          }
-        } catch (e) {}
-      }
-
-      // Parse season & episode from linkOrQuery string if present (e.g. S01E02 or 1x02)
-      if (typeof linkOrQuery === 'string') {
-        const sMatch = linkOrQuery.match(/S(\d+)E(\d+)/i) || linkOrQuery.match(/(\d+)x(\d+)/i);
-        if (sMatch) {
-          state.selectedSeason = parseInt(sMatch[1], 10);
-          state.selectedEpisode = parseInt(sMatch[2], 10);
-        }
-      }
-
-      // Fetch streams directly from Torrentio on client side (bypasses Cloudflare 403 blocks)
-      if (targetImdb && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
-        const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
-        const clientMirrors = [
-          `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
-        ];
-
-        for (const cUrl of clientMirrors) {
-          try {
-            const tRes = await fetch(cUrl);
-            const tData = await tRes.json();
-            if (tData && tData.streams && tData.streams.length > 0) {
-              clientStreams = tData.streams;
-              console.log(`[client] Fetched ${clientStreams.length} streams from Torrentio mirror for ${targetImdb}${epSuffix}: ${cUrl}`);
-              break;
-            }
-          } catch (e) {
-            console.warn('[client] Mirror failed:', cUrl, e.message);
-          }
-        }
-      }
 
       const res = await fetch('/api/debrid/smart-resolve', {
         method: 'POST',
@@ -1156,6 +1280,13 @@ document.addEventListener('DOMContentLoaded', () => {
     closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('active'));
     closeDetailBtn.addEventListener('click', () => detailModal.classList.remove('active'));
     closePlayerBtn.addEventListener('click', closeVideoPlayer);
+    const closeStreamsBtn = document.getElementById('closeStreamsBtn');
+    if (closeStreamsBtn) {
+      closeStreamsBtn.addEventListener('click', () => {
+        const streamsModal = document.getElementById('streamsModal');
+        if (streamsModal) streamsModal.classList.remove('active');
+      });
+    }
 
     saveApikeyBtn.addEventListener('click', async () => {
       const key = apikeyInput.value.trim();
