@@ -507,7 +507,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         debugLog.uniqueHashes = uniqueStreams.length;
         console.log(`[smart-resolve] Trying ${uniqueStreams.length} unique hashes on AllDebrid...`);
 
-        for (const st of uniqueStreams.slice(0, 15)) {
+        for (const st of uniqueStreams.slice(0, 25)) {
           if (st.infoHash) {
             const magnetUri = `magnet:?xt=urn:btih:${st.infoHash}&dn=${encodeURIComponent(title || 'Video')}`;
             const uploadUrl = `https://api.alldebrid.com/v4/magnet/upload?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&magnets[]=${encodeURIComponent(magnetUri)}`;
@@ -527,6 +527,18 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
                   const magInfo = Array.isArray(rawMags) ? rawMags[0] : rawMags;
                   if (magInfo) {
                     files = magInfo.files || magInfo.links;
+                    // If magnet is currently downloading, wait 1.2s and poll status again
+                    if ((!files || files.length === 0) && (magInfo.status === 'Downloading' || magInfo.statusCode === 1 || magInfo.statusCode === 2)) {
+                      await new Promise(r => setTimeout(r, 1200));
+                      const retryRes = await makeRequest(statusUrl, { timeout: 7000 });
+                      if (retryRes.data && retryRes.data.data && retryRes.data.data.magnets) {
+                        const rMags = retryRes.data.data.magnets;
+                        const rInfo = Array.isArray(rMags) ? rMags[0] : rMags;
+                        if (rInfo) {
+                          files = rInfo.files || rInfo.links;
+                        }
+                      }
+                    }
                   }
                 }
               }

@@ -755,8 +755,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
         const clientMirrors = [
           `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+          `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
         ];
 
         for (const cUrl of clientMirrors) {
