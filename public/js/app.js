@@ -691,9 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------
   async function resolveAndPlayLink(linkOrQuery) {
     if (!state.apiKey) {
-      showToast('Ingresa tu API Key de AllDebrid en los Ajustes primero', 'error');
-      settingsModal.classList.add('active');
-      return;
+      showToast('Sin API Key de AllDebrid. Intentando reproducir directo/prueba.', 'warning');
     }
 
     const displayTitle = state.currentMedia 
@@ -712,10 +710,10 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-apikey': state.apiKey
+          'x-apikey': state.apiKey || ''
         },
         body: JSON.stringify({
-          apikey: state.apiKey,
+          apikey: state.apiKey || '',
           query: linkOrQuery,
           link: linkOrQuery && (linkOrQuery.startsWith('http') || linkOrQuery.startsWith('magnet:')) ? linkOrQuery : null,
           title: mediaTitle,
@@ -727,21 +725,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       const data = await res.json();
+      const streamUrl = data.stream ? (data.stream.download || data.stream.link) : null;
 
-      if (data.success && data.stream && data.stream.link) {
-        openVideoPlayer(data.stream.link, displayTitle);
-        showToast('¡Enlace desrestringido con AllDebrid con éxito!', 'success');
+      if (data.success && data.stream && streamUrl) {
+        openVideoPlayer(streamUrl, displayTitle);
+        showToast('¡Enlace obtenido y listo para reproducir!', 'success');
 
         // Update tracking progress for TV shows automatically
         if (state.currentMedia && state.currentMedia.media_type === 'tv') {
           updateEpisodeProgress(state.currentMedia.id, state.selectedSeason, state.selectedEpisode);
         }
       } else {
-        showToast(data.message || 'No se pudo resolver el vídeo con AllDebrid', 'error');
+        showToast(data.message || 'No se pudo resolver el vídeo', 'error');
       }
     } catch (err) {
       console.error('Error al resolver enlace:', err);
-      showToast('Error de red al conectar con AllDebrid', 'error');
+      showToast('Error de red al conectar con el servidor', 'error');
     }
   }
 

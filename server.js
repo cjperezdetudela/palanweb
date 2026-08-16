@@ -15,6 +15,9 @@ const WEB_USERNAME = process.env.WEB_USERNAME || 'admin';
 const WEB_PASSWORD = process.env.WEB_PASSWORD || 'palanweb';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'palanweb_secret_key_2026';
 
+// TMDB API Key Configuration
+const TMDB_API_KEY = process.env.TMDB_API_KEY || '8476a7ab80ad76f0936744df0430e67c';
+
 // Store active token sessions in memory: Map<token, { username, createdAt }>
 const activeSessions = new Map();
 
@@ -372,8 +375,9 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         const statusRes = await makeRequest(statusUrl);
 
         if (statusRes.data && statusRes.data.data && statusRes.data.data.magnets) {
-          const magInfo = statusRes.data.data.magnets;
-          if (magInfo.files && magInfo.files.length > 0) {
+          const rawMags = statusRes.data.data.magnets;
+          const magInfo = Array.isArray(rawMags) ? rawMags[0] : rawMags;
+          if (magInfo && magInfo.files && magInfo.files.length > 0) {
             const selectedFile = isTv 
               ? findEpisodeFile(magInfo.files, season || 1, episode || 1)
               : findMovieVideoFile(magInfo.files);
@@ -468,8 +472,9 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
               const statusRes = await makeRequest(statusUrl);
 
               if (statusRes.data && statusRes.data.data && statusRes.data.data.magnets) {
-                const magInfo = statusRes.data.data.magnets;
-                if (magInfo.status === 'Ready' && magInfo.files && magInfo.files.length > 0) {
+                const rawMags = statusRes.data.data.magnets;
+                const magInfo = Array.isArray(rawMags) ? rawMags[0] : rawMags;
+                if (magInfo && (magInfo.status === 'Ready' || magInfo.statusCode === 4) && magInfo.files && magInfo.files.length > 0) {
                   const selectedFile = isTv 
                     ? findEpisodeFile(magInfo.files, season || 1, episode || 1)
                     : findMovieVideoFile(magInfo.files);
@@ -514,7 +519,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
 // -------------------------------------------------------------
 // CATALOG & SEARCH (TMDB / Embedded Provider)
 // -------------------------------------------------------------
-const TMDB_API_KEY = '8476a7ab80ad76f0936744df0430e67c';
+
 
 
 // Fallback Catalog Data
