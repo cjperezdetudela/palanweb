@@ -272,8 +272,10 @@ function flattenFiles(filesArray) {
   if (!filesArray || !Array.isArray(filesArray)) return [];
   const result = [];
   filesArray.forEach(item => {
-    if (item.l && item.n) {
-      result.push(item);
+    const link = item.l || item.link;
+    const name = item.n || item.filename || item.name;
+    if (link && name) {
+      result.push({ ...item, l: link, n: name });
     }
     if (item.e && Array.isArray(item.e)) {
       result.push(...flattenFiles(item.e));
@@ -296,8 +298,13 @@ function findEpisodeFile(filesArray, seasonNum, episodeNum) {
     new RegExp(`${sStr}x${eStr}`, 'i'),
     new RegExp(`${seasonNum}x${eStr}`, 'i'),
     new RegExp(`${seasonNum}x${episodeNum}`, 'i'),
-    new RegExp(`Cap[\\._ ]?${seasonNum}?${eStr}`, 'i'),
-    new RegExp(`E${eStr}`, 'i')
+    new RegExp(`Cap[\\._\\s]?${seasonNum}?${eStr}`, 'i'),
+    new RegExp(`Cap[\\._\\s]?${eStr}`, 'i'),
+    new RegExp(`Capitulo[\\._\\s]?${episodeNum}`, 'i'),
+    new RegExp(`Capitulo[\\._\\s]?${eStr}`, 'i'),
+    new RegExp(`E${eStr}`, 'i'),
+    new RegExp(`Episodio[\\._\\s]?${episodeNum}`, 'i'),
+    new RegExp(`Episodio[\\._\\s]?${eStr}`, 'i')
   ];
 
   for (const pat of patterns) {
