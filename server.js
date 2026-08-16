@@ -124,61 +124,36 @@ app.use((req, res, next) => {
   next();
 });
 
-// Helper for HTTP/HTTPS requests with Redirect Support
-function makeRequest(url, options = {}, redirectCount = 0) {
-  return new Promise((resolve, reject) => {
-    if (redirectCount > 5) return resolve({ statusCode: 508, data: null, raw: '' });
-    const client = url.startsWith('https') ? https : http;
-    const reqOptions = {
+// Helper for HTTP/HTTPS requests with Redirect & Compression Support
+async function makeRequest(url, options = {}) {
+  try {
+    const controller = new AbortController();
+    const timeoutMs = options.timeout || 10000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, {
+      method: options.method || 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
         ...(options.headers || {})
       },
-      method: options.method || 'GET'
-    };
-
-    const req = client.request(url, reqOptions, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const redirectUrl = res.headers.location.startsWith('/')
-          ? new URL(url).origin + res.headers.location
-          : res.headers.location;
-        return makeRequest(redirectUrl, options, redirectCount + 1).then(resolve).catch(reject);
-      }
-
-      let stream = res;
-      const encoding = (res.headers['content-encoding'] || '').toLowerCase();
-      if (encoding === 'gzip') {
-        stream = res.pipe(zlib.createGunzip());
-      } else if (encoding === 'deflate') {
-        stream = res.pipe(zlib.createInflate());
-      } else if (encoding === 'br') {
-        stream = res.pipe(zlib.createBrotliDecompress());
-      }
-
-      let data = '';
-      stream.on('data', (chunk) => (data += chunk));
-      stream.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          resolve({ statusCode: res.statusCode, data: parsed, raw: data });
-        } catch (e) {
-          resolve({ statusCode: res.statusCode, data: null, raw: data });
-        }
-      });
+      signal: controller.signal,
+      body: options.body || undefined
     });
 
-    req.setTimeout(options.timeout || 10000, () => {
-      req.destroy();
-      resolve({ statusCode: 408, data: null, raw: 'Request Timeout' });
-    });
+    clearTimeout(timer);
 
-    req.on('error', (err) => resolve({ statusCode: 500, data: null, raw: err.message }));
-    if (options.body) {
-      req.write(options.body);
-    }
-    req.end();
-  });
+    const raw = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {}
+
+    return { statusCode: response.status, data, raw };
+  } catch (err) {
+    return { statusCode: 500, data: null, raw: err.message };
+  }
 }
 
 // AllDebrid Agent Name required by AllDebrid API
@@ -351,7 +326,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
   const clientKey = req.headers['x-apikey'] || req.body.apikey;
   const apikey = (clientKey && clientKey.trim()) ? clientKey.trim() : DEFAULT_ALLDEBRID_KEY;
   const { title, query, link, type, season, episode, imdbId, tmdbId } = req.body;
-  const isTv = type === 'tv';
+  const isTv = type === 'tv' || type === 'series' || type === 'show';
   const targetLink = link || query;
   const FALLBACK_VIDEO = 'https://vjs.zencdn.net/v/oceans.mp4';
 
