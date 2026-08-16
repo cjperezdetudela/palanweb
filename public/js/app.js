@@ -1017,10 +1017,13 @@ document.addEventListener('DOMContentLoaded', () => {
     webVideoPlayer.src = streamUrl;
     webVideoPlayer.play().catch(e => console.log('Auto-play prevent:', e));
 
-    // Deep-links for iOS apps
+    // Deep-links for iOS / PC apps
     const encodedUrl = encodeURIComponent(streamUrl);
     openInfuseBtn.href = `infuse://x-callback-url/play?url=${encodedUrl}`;
-    openVlcBtn.href = `vlc://${streamUrl}`;
+
+    // Clean VLC scheme for mobile and PC protocol handlers
+    const cleanVlcUrl = streamUrl.replace(/^https?:\/\//, '');
+    openVlcBtn.href = `vlc://${cleanVlcUrl}`;
 
     playerOverlay.classList.add('active');
     detailModal.classList.remove('active');
@@ -1188,6 +1191,35 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       resolveAndPlayLink(inputVal);
     });
+
+    // Open in VLC (PC & Mobile fallback with .m3u playlist download)
+    if (openVlcBtn) {
+      openVlcBtn.addEventListener('click', (e) => {
+        if (!state.currentStreamUrl) return;
+
+        // Copy direct link to clipboard for convenience
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(state.currentStreamUrl).catch(() => {});
+        }
+
+        // Generate .m3u playlist file so double clicking it opens VLC directly on Windows/Mac PC
+        const title = playerTitle.textContent || 'Video';
+        const cleanTitle = title.replace(/[^\w\s-]/gi, '').trim() || 'palanweb_video';
+        const m3uContent = `#EXTM3U\n#EXTINF:-1,${title}\n${state.currentStreamUrl}\n`;
+        const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const downloadLink = document.createElement('a');
+        downloadLink.href = blobUrl;
+        downloadLink.download = `${cleanTitle}.m3u`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+        showToast('Descargando archivo .m3u para VLC y enlace copiado', 'success');
+      });
+    }
 
     // Copy stream URL
     copyStreamUrlBtn.addEventListener('click', () => {
