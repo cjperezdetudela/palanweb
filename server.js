@@ -426,6 +426,17 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
   console.log(`[smart-resolve] Resolving for title="${title}", query="${query}", tmdbId=${tmdbId}, isTv=${isTv}`);
   console.log(`[smart-resolve] Resolved IMDb ID: ${targetImdb}`);
 
+  let debugLog = {
+    targetImdb: targetImdb || null,
+    tmdbId: tmdbId || null,
+    isTv,
+    tmdbKeyPresent: !!TMDB_API_KEY,
+    streamsFound: 0,
+    uniqueHashes: 0,
+    uploadAttempts: [],
+    lastError: null
+  };
+
   // 4. Search and unlock audio streams (Prioritizing Spanish / Castellano)
   if (targetImdb && apikey) {
     try {
@@ -445,8 +456,12 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
           streams = searchRes.data.streams;
           console.log(`[smart-resolve] Found ${streams.length} streams from mirror: ${mUrl}`);
           break;
+        } else {
+          debugLog.uploadAttempts.push({ mirror: mUrl, status: searchRes.statusCode, rawSnippet: (searchRes.raw || '').substring(0, 100) });
         }
       }
+
+      debugLog.streamsFound = streams.length;
 
       if (streams.length > 0) {
         const getStreamText = (st) => ((st.title || '') + ' ' + (st.name || '') + ' ' + (st.behaviorHints?.filename || '')).toLowerCase();
@@ -478,6 +493,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
           }
         }
 
+        debugLog.uniqueHashes = uniqueStreams.length;
         console.log(`[smart-resolve] Trying ${uniqueStreams.length} unique hashes on AllDebrid...`);
 
         for (const st of uniqueStreams.slice(0, 15)) {
@@ -520,6 +536,8 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
                   }
                 }
               }
+            } else {
+              debugLog.uploadAttempts.push({ hash: st.infoHash, res: uploadRes.data || uploadRes.raw });
             }
           }
         }
@@ -527,6 +545,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         console.log(`[smart-resolve] No streams found from Torrentio mirrors for IMDb ${targetImdb}`);
       }
     } catch (err) {
+      debugLog.lastError = err.message;
       console.error('[smart-resolve] Error resolviendo magnet para título:', err);
     }
   }
@@ -535,12 +554,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
   return res.json({
     success: false,
     message: `No se pudo encontrar ningún enlace disponible en AllDebrid para "${title || 'este título'}"`,
-    debug: {
-      targetImdb: targetImdb || null,
-      tmdbId: tmdbId || null,
-      isTv,
-      tmdbKeyPresent: !!TMDB_API_KEY
-    }
+    debug: debugLog
   });
 });
 
