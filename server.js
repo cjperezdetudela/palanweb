@@ -534,7 +534,13 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
   // Return clear error if no stream could be resolved
   return res.json({
     success: false,
-    message: `No se pudo encontrar ningún enlace disponible en AllDebrid para "${title || 'este título'}"`
+    message: `No se pudo encontrar ningún enlace disponible en AllDebrid para "${title || 'este título'}"`,
+    debug: {
+      targetImdb: targetImdb || null,
+      tmdbId: tmdbId || null,
+      isTv,
+      tmdbKeyPresent: !!TMDB_API_KEY
+    }
   });
 });
 
