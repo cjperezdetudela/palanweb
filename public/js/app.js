@@ -753,7 +753,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch('/api/debrid/streams', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${webAuthToken || ''}`,
+          'x-web-token': webAuthToken || '',
+          'x-apikey': state.apiKey || ''
+        },
         body: JSON.stringify({
           title: mediaTitle,
           type: mediaType,

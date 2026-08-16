@@ -106,12 +106,18 @@ app.post('/api/auth/logout', (req, res) => {
 app.use((req, res, next) => {
   if (!WEB_AUTH_REQUIRED) return next();
   
-  // Public auth endpoints & health
-  if (req.path.startsWith('/api/auth/') || req.path === '/api/health') {
+  // Public auth endpoints, health, catalog, palantir & debrid stream routes
+  if (
+    req.path.startsWith('/api/auth/') ||
+    req.path === '/api/health' ||
+    req.path.startsWith('/api/catalog/') ||
+    req.path.startsWith('/api/debrid/') ||
+    req.path.startsWith('/api/palantir/')
+  ) {
     return next();
   }
 
-  // Guard all /api/ routes
+  // Guard all other /api/ routes
   if (req.path.startsWith('/api/')) {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : (req.headers['x-web-token'] || req.query.token);
