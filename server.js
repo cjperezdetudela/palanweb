@@ -134,7 +134,7 @@ async function makeRequest(url, options = {}) {
     const response = await fetch(url, {
       method: options.method || 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': options.headers?.['User-Agent'] || 'Stremio/4.4.168',
         'Accept': 'application/json, text/plain, */*',
         ...(options.headers || {})
       },
@@ -531,13 +531,10 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
     }
   }
 
-  // 5. Guaranteed Fallback Stream (Ensures all videos play seamlessly)
+  // Return clear error if no stream could be resolved
   return res.json({
-    success: true,
-    stream: {
-      download: FALLBACK_VIDEO,
-      filename: `${title || 'Película / Serie'} (Vídeo de prueba HD)`
-    }
+    success: false,
+    message: `No se pudo encontrar ningún enlace disponible en AllDebrid para "${title || 'este título'}"`
   });
 });
 
