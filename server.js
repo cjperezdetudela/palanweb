@@ -451,21 +451,15 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
       const epSuffix = isTv ? `:${season || 1}:${episode || 1}` : '';
 
       const mirrors = [
-        `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+        `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
       ];
 
       let streams = (Array.isArray(clientStreams) && clientStreams.length > 0) ? clientStreams : [];
       if (streams.length > 0) {
         console.log(`[smart-resolve] Using ${streams.length} streams provided directly by client browser`);
       } else {
-        const mirrors = [
-          `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
-        ];
-
         for (const mUrl of mirrors) {
           const searchRes = await makeRequest(mUrl, { timeout: 7000 });
           if (searchRes.data && searchRes.data.streams && searchRes.data.streams.length > 0) {

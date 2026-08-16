@@ -754,9 +754,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetImdb && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
         const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
         const clientMirrors = [
-          `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-          `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+          `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
         ];
 
         for (const cUrl of clientMirrors) {
