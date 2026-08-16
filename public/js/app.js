@@ -723,6 +723,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
       }
 
+      // Search TMDB by text title if IMDb ID still missing
+      if (!targetImdb && mediaTitle) {
+        try {
+          const cleanTitle = mediaTitle.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
+          const sRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=8476a7ab80ad76f0936744df0430e67c&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`);
+          const sData = await sRes.json();
+          if (sData && sData.results && sData.results.length > 0) {
+            const match = sData.results[0];
+            const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
+            const extRes = await fetch(`https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=8476a7ab80ad76f0936744df0430e67c`);
+            const extData = await extRes.json();
+            if (extData && extData.imdb_id) {
+              targetImdb = extData.imdb_id;
+            }
+          }
+        } catch (e) {}
+      }
+
       // Fetch streams directly from Torrentio on client side (bypasses Cloudflare 403 blocks)
       if (targetImdb && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
         try {
@@ -732,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const tData = await tRes.json();
           if (tData && tData.streams && tData.streams.length > 0) {
             clientStreams = tData.streams;
-            console.log(`[client] Fetched ${clientStreams.length} streams directly from Torrentio`);
+            console.log(`[client] Fetched ${clientStreams.length} streams directly from Torrentio for IMDb ${targetImdb}`);
           }
         } catch (e) {
           console.warn('[client] Failed to fetch Torrentio streams on client side:', e);

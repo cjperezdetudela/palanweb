@@ -872,7 +872,7 @@ app.get('/api/catalog/details/:type/:id', async (req, res) => {
   const fallbackItem = FALLBACK_CATALOG.find(i => i.id === numericId);
 
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}&language=es-ES&append_to_response=videos,credits,recommendations`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}&language=es-ES&append_to_response=external_ids,videos,credits,recommendations`;
     const response = await makeRequest(url);
 
     if (response.data && !response.data.status_code && (response.data.title || response.data.name)) {
