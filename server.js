@@ -444,9 +444,9 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
       const epSuffix = isTv ? `:${season || 1}:${episode || 1}` : '';
 
       const mirrors = [
-        `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.app/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+        `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
       ];
 
       let streams = [];
