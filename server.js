@@ -337,7 +337,7 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
   const { title, query, link, type, season, episode, imdbId, tmdbId } = req.body;
   const isTv = type === 'tv';
   const targetLink = link || query;
-  const FALLBACK_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4';
+  const FALLBACK_VIDEO = 'https://vjs.zencdn.net/v/oceans.mp4';
 
   // 1. Direct link handling (http/https mp4 or direct streams)
   if (targetLink && (targetLink.startsWith('http://') || targetLink.startsWith('https://')) && !targetLink.startsWith('magnet:')) {
@@ -406,7 +406,29 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         targetImdb = extRes.data.imdb_id;
       }
     } catch (e) {
-      console.error('Error obteniendo IMDb ID dinámico:', e);
+      console.error('Error obteniendo IMDb ID dinámico desde tmdbId:', e);
+    }
+  }
+
+  // Search TMDB by text title/query if tmdbId/imdbId were missing
+  if (!targetImdb && (title || query)) {
+    try {
+      const searchQuery = (title || query).replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
+      if (searchQuery) {
+        const searchUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(searchQuery)}&page=1`;
+        const searchRes = await makeRequest(searchUrl);
+        if (searchRes.data && searchRes.data.results && searchRes.data.results.length > 0) {
+          const match = searchRes.data.results[0];
+          const matchType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
+          const extUrl = `https://api.themoviedb.org/3/${matchType}/${match.id}/external_ids?api_key=${TMDB_API_KEY}`;
+          const extRes = await makeRequest(extUrl);
+          if (extRes.data && extRes.data.imdb_id) {
+            targetImdb = extRes.data.imdb_id;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error obteniendo IMDb ID por texto:', e);
     }
   }
 
