@@ -705,6 +705,39 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : 'Reproducción en Directo';
       const mediaType = state.currentMedia ? state.currentMedia.media_type : 'movie';
+      const isTv = mediaType === 'tv' || mediaType === 'series' || mediaType === 'show';
+      const mediaKind = isTv ? 'series' : 'movie';
+      const tmdbId = state.currentMedia ? state.currentMedia.id : null;
+
+      let clientStreams = [];
+      let targetImdb = state.currentMedia ? (state.currentMedia.imdb_id || (state.currentMedia.external_ids ? state.currentMedia.external_ids.imdb_id : null)) : null;
+
+      // Fetch IMDb ID if missing and tmdbId exists
+      if (!targetImdb && tmdbId) {
+        try {
+          const extRes = await fetch(`/api/catalog/details/${isTv ? 'tv' : 'movie'}/${tmdbId}`);
+          const extData = await extRes.json();
+          if (extData.success && extData.details) {
+            targetImdb = extData.details.imdb_id || (extData.details.external_ids ? extData.details.external_ids.imdb_id : null);
+          }
+        } catch (e) {}
+      }
+
+      // Fetch streams directly from Torrentio on client side (bypasses Cloudflare 403 blocks)
+      if (targetImdb && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
+        try {
+          const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
+          const torrentioUrl = `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`;
+          const tRes = await fetch(torrentioUrl);
+          const tData = await tRes.json();
+          if (tData && tData.streams && tData.streams.length > 0) {
+            clientStreams = tData.streams;
+            console.log(`[client] Fetched ${clientStreams.length} streams directly from Torrentio`);
+          }
+        } catch (e) {
+          console.warn('[client] Failed to fetch Torrentio streams on client side:', e);
+        }
+      }
 
       const res = await fetch('/api/debrid/smart-resolve', {
         method: 'POST',
@@ -718,7 +751,9 @@ document.addEventListener('DOMContentLoaded', () => {
           link: linkOrQuery && (linkOrQuery.startsWith('http') || linkOrQuery.startsWith('magnet:')) ? linkOrQuery : null,
           title: mediaTitle,
           type: mediaType,
-          tmdbId: state.currentMedia ? state.currentMedia.id : null,
+          tmdbId: tmdbId,
+          imdbId: targetImdb,
+          streams: clientStreams,
           season: state.selectedSeason || 1,
           episode: state.selectedEpisode || 1
         })
@@ -732,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('¡Enlace obtenido y listo para reproducir!', 'success');
 
         // Update tracking progress for TV shows automatically
-        if (state.currentMedia && state.currentMedia.media_type === 'tv') {
+        if (state.currentMedia && isTv) {
           updateEpisodeProgress(state.currentMedia.id, state.selectedSeason, state.selectedEpisode);
         }
       } else {

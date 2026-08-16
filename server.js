@@ -325,7 +325,7 @@ const DEFAULT_ALLDEBRID_KEY = process.env.ALLDEBRID_API_KEY || 'xSk7D1sWYiGGNnUJ
 app.post('/api/debrid/smart-resolve', async (req, res) => {
   const clientKey = req.headers['x-apikey'] || req.body.apikey;
   const apikey = (clientKey && clientKey.trim()) ? clientKey.trim() : DEFAULT_ALLDEBRID_KEY;
-  const { title, query, link, type, season, episode, imdbId, tmdbId } = req.body;
+  const { title, query, link, type, season, episode, imdbId, tmdbId, streams: clientStreams } = req.body;
   const isTv = type === 'tv' || type === 'series' || type === 'show';
   const targetLink = link || query;
   const FALLBACK_VIDEO = 'https://vjs.zencdn.net/v/oceans.mp4';
@@ -449,15 +449,25 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
         `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
       ];
 
-      let streams = [];
-      for (const mUrl of mirrors) {
-        const searchRes = await makeRequest(mUrl, { timeout: 7000 });
-        if (searchRes.data && searchRes.data.streams && searchRes.data.streams.length > 0) {
-          streams = searchRes.data.streams;
-          console.log(`[smart-resolve] Found ${streams.length} streams from mirror: ${mUrl}`);
-          break;
-        } else {
-          debugLog.uploadAttempts.push({ mirror: mUrl, status: searchRes.statusCode, rawSnippet: (searchRes.raw || '').substring(0, 100) });
+      let streams = (Array.isArray(clientStreams) && clientStreams.length > 0) ? clientStreams : [];
+      if (streams.length > 0) {
+        console.log(`[smart-resolve] Using ${streams.length} streams provided directly by client browser`);
+      } else {
+        const mirrors = [
+          `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+        ];
+
+        for (const mUrl of mirrors) {
+          const searchRes = await makeRequest(mUrl, { timeout: 7000 });
+          if (searchRes.data && searchRes.data.streams && searchRes.data.streams.length > 0) {
+            streams = searchRes.data.streams;
+            console.log(`[smart-resolve] Found ${streams.length} streams from mirror: ${mUrl}`);
+            break;
+          } else {
+            debugLog.uploadAttempts.push({ mirror: mUrl, status: searchRes.statusCode, rawSnippet: (searchRes.raw || '').substring(0, 100) });
+          }
         }
       }
 
