@@ -741,19 +741,36 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
       }
 
+      // Parse season & episode from linkOrQuery string if present (e.g. S01E02 or 1x02)
+      if (typeof linkOrQuery === 'string') {
+        const sMatch = linkOrQuery.match(/S(\d+)E(\d+)/i) || linkOrQuery.match(/(\d+)x(\d+)/i);
+        if (sMatch) {
+          state.selectedSeason = parseInt(sMatch[1], 10);
+          state.selectedEpisode = parseInt(sMatch[2], 10);
+        }
+      }
+
       // Fetch streams directly from Torrentio on client side (bypasses Cloudflare 403 blocks)
       if (targetImdb && (!linkOrQuery || (!linkOrQuery.startsWith('http') && !linkOrQuery.startsWith('magnet:')))) {
-        try {
-          const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
-          const torrentioUrl = `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`;
-          const tRes = await fetch(torrentioUrl);
-          const tData = await tRes.json();
-          if (tData && tData.streams && tData.streams.length > 0) {
-            clientStreams = tData.streams;
-            console.log(`[client] Fetched ${clientStreams.length} streams directly from Torrentio for IMDb ${targetImdb}`);
+        const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
+        const clientMirrors = [
+          `https://torrentio.strem.fun/language=spanish|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+          `https://torrentio.strem.fun/sort=quality|providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+        ];
+
+        for (const cUrl of clientMirrors) {
+          try {
+            const tRes = await fetch(cUrl);
+            const tData = await tRes.json();
+            if (tData && tData.streams && tData.streams.length > 0) {
+              clientStreams = tData.streams;
+              console.log(`[client] Fetched ${clientStreams.length} streams from Torrentio mirror for ${targetImdb}${epSuffix}: ${cUrl}`);
+              break;
+            }
+          } catch (e) {
+            console.warn('[client] Mirror failed:', cUrl, e.message);
           }
-        } catch (e) {
-          console.warn('[client] Failed to fetch Torrentio streams on client side:', e);
         }
       }
 
