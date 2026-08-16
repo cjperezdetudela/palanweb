@@ -834,6 +834,112 @@ app.get('/api/catalog/search', async (req, res) => {
 });
 
 
+// Fetch Stream Options for Palantir Stream Selector Modal
+app.post('/api/debrid/streams', async (req, res) => {
+  const { title, type, season, episode, tmdbId, imdbId } = req.body;
+  const isTv = type === 'tv' || type === 'series' || type === 'show';
+  const mediaKind = isTv ? 'series' : 'movie';
+
+  let targetImdb = imdbId;
+
+  if (!targetImdb && tmdbId) {
+    try {
+      const extUrl = `https://api.themoviedb.org/3/${isTv ? 'tv' : 'movie'}/${tmdbId}/external_ids?api_key=${TMDB_API_KEY}`;
+      const extRes = await makeRequest(extUrl);
+      if (extRes.data && extRes.data.imdb_id) {
+        targetImdb = extRes.data.imdb_id;
+      }
+    } catch (e) {}
+  }
+
+  if (!targetImdb && title) {
+    try {
+      const cleanTitle = title.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
+      const sUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`;
+      const sRes = await makeRequest(sUrl);
+      if (sRes.data && sRes.data.results && sRes.data.results.length > 0) {
+        const match = sRes.data.results[0];
+        const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
+        const extUrl = `https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=${TMDB_API_KEY}`;
+        const extRes = await makeRequest(extUrl);
+        if (extRes.data && extRes.data.imdb_id) {
+          targetImdb = extRes.data.imdb_id;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!targetImdb) {
+    return res.json({ success: false, message: 'No se pudo obtener la ID del contenido', streams: [] });
+  }
+
+  const epSuffix = isTv ? `:${season || 1}:${episode || 1}` : '';
+  const mirrors = [
+    `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+    `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+    `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+  ];
+
+  let rawStreams = [];
+  for (const mUrl of mirrors) {
+    try {
+      const response = await makeRequest(mUrl);
+      if (response.data && response.data.streams && response.data.streams.length > 0) {
+        rawStreams = response.data.streams;
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (rawStreams.length === 0) {
+    return res.json({ success: false, message: 'No se encontraron fuentes disponibles', streams: [] });
+  }
+
+  const parsedStreams = rawStreams.map(st => {
+    const titleText = (st.title || '') + ' ' + (st.name || '') + ' ' + (st.behaviorHints?.filename || '');
+    const txt = titleText.toLowerCase();
+
+    let quality = 'HD';
+    if (/2160p|4k|uhd/i.test(txt)) quality = '4K UHD';
+    else if (/1080p|fhd/i.test(txt)) quality = '1080p';
+    else if (/720p/i.test(txt)) quality = '720p';
+    else if (/480p|dvdrip|sd/i.test(txt)) quality = '480p';
+
+    let audio = '🇬🇧 Inglés / VOS';
+    if (/\[esp\]|castellano|español|lobezno|dontorrent|grantorrent|wolfmax4k|descargas2020|newpct|todotorrents|atomohd|spa\b|esp\b|spanish|spain|🇪🇸/i.test(txt)) {
+      audio = '🇪🇸 Castellano';
+    } else if (/latino|lat\b|🇲🇽/i.test(txt)) {
+      audio = '🇲🇽 Latino';
+    } else if (/multi|dual/i.test(txt)) {
+      audio = '🌐 Multi-Audio';
+    }
+
+    const sizeMatch = titleText.match(/💾\s*([\d\.]+\s*(?:GB|MB))/i) || titleText.match(/([\d\.]+\s*(?:GB|MB))/i);
+    const size = sizeMatch ? sizeMatch[1] : '';
+
+    const providerMatch = titleText.match(/⚙️\s*([^\n\r]+)/) || titleText.match(/([A-Za-z0-9]+Torrent[A-Za-z0-9]*|1337x|RARBG|TorrentGalaxy|EZTV|ThePirateBay)/i);
+    const provider = providerMatch ? providerMatch[1].trim() : 'Torrent';
+
+    return {
+      quality,
+      audio,
+      size,
+      provider,
+      infoHash: st.infoHash,
+      stream: st
+    };
+  });
+
+  const castellano = parsedStreams.filter(p => p.audio.includes('Castellano'));
+  const multi = parsedStreams.filter(p => p.audio.includes('Multi'));
+  const latino = parsedStreams.filter(p => p.audio.includes('Latino'));
+  const others = parsedStreams.filter(p => !castellano.includes(p) && !multi.includes(p) && !latino.includes(p));
+
+  const sortedStreams = [...castellano, ...multi, ...latino, ...others];
+
+  return res.json({ success: true, streams: sortedStreams });
+});
+
 // -------------------------------------------------------------
 // PALANTIR 3 API ENDPOINTS & CATALOG CLONE
 // -------------------------------------------------------------

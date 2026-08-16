@@ -746,66 +746,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const mediaTitle = state.currentMedia ? (state.currentMedia.title || state.currentMedia.name) : 'Reproducción en Directo';
     const mediaType = state.currentMedia ? state.currentMedia.media_type : 'movie';
     const isTv = mediaType === 'tv' || mediaType === 'series' || mediaType === 'show';
-    const mediaKind = isTv ? 'series' : 'movie';
     const tmdbId = state.currentMedia ? state.currentMedia.id : null;
-
     let targetImdb = state.currentMedia ? (state.currentMedia.imdb_id || (state.currentMedia.external_ids ? state.currentMedia.external_ids.imdb_id : null)) : null;
 
-    // Fetch IMDb ID if missing
-    if (!targetImdb && tmdbId) {
-      try {
-        const extRes = await fetch(`/api/catalog/details/${isTv ? 'tv' : 'movie'}/${tmdbId}`);
-        const extData = await extRes.json();
-        if (extData.success && extData.details) {
-          targetImdb = extData.details.imdb_id || (extData.details.external_ids ? extData.details.external_ids.imdb_id : null);
-        }
-      } catch (e) {}
-    }
-
-    // Search TMDB by title if IMDb ID still missing
-    if (!targetImdb && mediaTitle) {
-      try {
-        const cleanTitle = mediaTitle.replace(/S\d+E\d+/i, '').replace(/T\d+E\d+/i, '').replace(/\d{4}/, '').trim();
-        const sRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=8476a7ab80ad76f0936744df0430e67c&language=es-ES&query=${encodeURIComponent(cleanTitle)}&page=1`);
-        const sData = await sRes.json();
-        if (sData && sData.results && sData.results.length > 0) {
-          const match = sData.results[0];
-          const mType = match.media_type || (match.first_air_date ? 'tv' : 'movie');
-          const extRes = await fetch(`https://api.themoviedb.org/3/${mType}/${match.id}/external_ids?api_key=8476a7ab80ad76f0936744df0430e67c`);
-          const extData = await extRes.json();
-          if (extData && extData.imdb_id) {
-            targetImdb = extData.imdb_id;
-          }
-        }
-      } catch (e) {}
-    }
-
-    let allStreams = [];
-    if (targetImdb) {
-      const epSuffix = isTv ? `:${state.selectedSeason || 1}:${state.selectedEpisode || 1}` : '';
-      const clientMirrors = [
-        `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
-        `https://torrentio.strem.fun/sort=quality/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
-      ];
-
-      for (const cUrl of clientMirrors) {
-        try {
-          const tRes = await fetch(cUrl);
-          const tData = await tRes.json();
-          if (tData && tData.streams && tData.streams.length > 0) {
-            allStreams = tData.streams;
-            console.log(`[client] Found ${allStreams.length} streams from Torrentio mirror: ${cUrl}`);
-            break;
-          }
-        } catch (e) {}
+    let sortedStreams = [];
+    try {
+      const res = await fetch('/api/debrid/streams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: mediaTitle,
+          type: mediaType,
+          tmdbId: tmdbId,
+          imdbId: targetImdb,
+          season: state.selectedSeason || 1,
+          episode: state.selectedEpisode || 1
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.streams && data.streams.length > 0) {
+        sortedStreams = data.streams;
       }
+    } catch (err) {
+      console.error('Error al obtener lista de streams:', err);
     }
 
     streamsListLoading.classList.add('hidden');
     streamsListContainer.classList.remove('hidden');
 
-    if (allStreams.length === 0) {
+    if (sortedStreams.length === 0) {
       streamsListContainer.innerHTML = `
         <div style="padding: 20px; text-align: center; color: #94a3b8;">
           <p>No se encontraron opciones múltiples. Intentando desrestricción directa...</p>
@@ -817,16 +786,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 1000);
       return;
     }
-
-    const parsedStreams = allStreams.map(parseStreamMetadata);
-
-    // Group & Sort: Castellano -> Multi -> Latino -> VOS
-    const castellano = parsedStreams.filter(p => p.audio.includes('Castellano'));
-    const multi = parsedStreams.filter(p => p.audio.includes('Multi'));
-    const latino = parsedStreams.filter(p => p.audio.includes('Latino'));
-    const others = parsedStreams.filter(p => !castellano.includes(p) && !multi.includes(p) && !latino.includes(p));
-
-    const sortedStreams = [...castellano, ...multi, ...latino, ...others];
 
     sortedStreams.forEach((item, index) => {
       const card = document.createElement('div');
