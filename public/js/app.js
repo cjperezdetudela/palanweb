@@ -1085,7 +1085,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load stream into HTML5 Video
     webVideoPlayer.src = streamUrl;
+
+    // Automatic Spanish audio track selector for multi-audio files
+    webVideoPlayer.onloadedmetadata = () => {
+      if (webVideoPlayer.audioTracks && webVideoPlayer.audioTracks.length > 1) {
+        for (let i = 0; i < webVideoPlayer.audioTracks.length; i++) {
+          const track = webVideoPlayer.audioTracks[i];
+          const lang = (track.language || track.label || '').toLowerCase();
+          if (lang.includes('es') || lang.includes('spa') || lang.includes('spanish') || lang.includes('español')) {
+            track.enabled = true;
+            console.log('[player] Switched to Spanish audio track:', track.label || track.language);
+          } else {
+            track.enabled = false;
+          }
+        }
+      }
+    };
+
     webVideoPlayer.play().catch(e => console.log('Auto-play prevent:', e));
+
+    // Show notice for multi-audio files
+    showToast('💡 Si el vídeo es Multi-Audio y suena en inglés, selecciona "Español" en el menú de Audio de tu reproductor o VLC.', 'info');
 
     // Deep-links for iOS / PC apps
     const encodedUrl = encodeURIComponent(streamUrl);
