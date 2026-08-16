@@ -157,7 +157,12 @@ function makeRequest(url, options = {}, redirectCount = 0) {
       });
     });
 
-    req.on('error', (err) => reject(err));
+    req.setTimeout(options.timeout || 10000, () => {
+      req.destroy();
+      resolve({ statusCode: 408, data: null, raw: 'Request Timeout' });
+    });
+
+    req.on('error', (err) => resolve({ statusCode: 500, data: null, raw: err.message }));
     if (options.body) {
       req.write(options.body);
     }
@@ -432,22 +437,28 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
     }
   }
 
+  console.log(`[smart-resolve] Resolving for title="${title}", query="${query}", tmdbId=${tmdbId}, isTv=${isTv}`);
+  console.log(`[smart-resolve] Resolved IMDb ID: ${targetImdb}`);
+
   // 4. Search and unlock audio streams (Prioritizing Spanish / Castellano)
   if (targetImdb && apikey) {
     try {
-      const spanishUrl = `https://torrentio.strem.fun/language=spanish/stream/${isTv ? 'series' : 'movie'}/${targetImdb}${isTv ? `:${season || 1}:${episode || 1}` : ''}.json`;
-      const defaultUrl = `https://torrentio.strem.fun/stream/${isTv ? 'series' : 'movie'}/${targetImdb}${isTv ? `:${season || 1}:${episode || 1}` : ''}.json`;
+      const mediaKind = isTv ? 'series' : 'movie';
+      const epSuffix = isTv ? `:${season || 1}:${episode || 1}` : '';
+
+      const mirrors = [
+        `https://torrentio.strem.fun/language=spanish/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.fun/stream/${mediaKind}/${targetImdb}${epSuffix}.json`,
+        `https://torrentio.strem.app/stream/${mediaKind}/${targetImdb}${epSuffix}.json`
+      ];
 
       let streams = [];
-      const searchResSp = await makeRequest(spanishUrl);
-      if (searchResSp.data && searchResSp.data.streams && searchResSp.data.streams.length > 0) {
-        streams = searchResSp.data.streams;
-      }
-
-      if (streams.length === 0) {
-        const searchResDef = await makeRequest(defaultUrl);
-        if (searchResDef.data && searchResDef.data.streams && searchResDef.data.streams.length > 0) {
-          streams = searchResDef.data.streams;
+      for (const mUrl of mirrors) {
+        const searchRes = await makeRequest(mUrl, { timeout: 7000 });
+        if (searchRes.data && searchRes.data.streams && searchRes.data.streams.length > 0) {
+          streams = searchRes.data.streams;
+          console.log(`[smart-resolve] Found ${streams.length} streams from mirror: ${mUrl}`);
+          break;
         }
       }
 
@@ -481,40 +492,56 @@ app.post('/api/debrid/smart-resolve', async (req, res) => {
           }
         }
 
+        console.log(`[smart-resolve] Trying ${uniqueStreams.length} unique hashes on AllDebrid...`);
+
         for (const st of uniqueStreams.slice(0, 15)) {
           if (st.infoHash) {
             const magnetUri = `magnet:?xt=urn:btih:${st.infoHash}&dn=${encodeURIComponent(title || 'Video')}`;
             const uploadUrl = `https://api.alldebrid.com/v4/magnet/upload?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&magnets[]=${encodeURIComponent(magnetUri)}`;
-            const uploadRes = await makeRequest(uploadUrl);
+            const uploadRes = await makeRequest(uploadUrl, { timeout: 7000 });
 
             if (uploadRes.data && uploadRes.data.status === 'success' && uploadRes.data.data.magnets[0]) {
-              const magId = uploadRes.data.data.magnets[0].id;
-              const statusUrl = `https://api.alldebrid.com/v4.1/magnet/status?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&id=${magId}`;
-              const statusRes = await makeRequest(statusUrl);
+              const magData = uploadRes.data.data.magnets[0];
+              const magId = magData.id;
 
-              if (statusRes.data && statusRes.data.data && statusRes.data.data.magnets) {
-                const rawMags = statusRes.data.data.magnets;
-                const magInfo = Array.isArray(rawMags) ? rawMags[0] : rawMags;
-                if (magInfo && (magInfo.status === 'Ready' || magInfo.statusCode === 4) && magInfo.files && magInfo.files.length > 0) {
-                  const selectedFile = isTv 
-                    ? findEpisodeFile(magInfo.files, season || 1, episode || 1)
-                    : findMovieVideoFile(magInfo.files);
+              let files = magData.files || magData.links;
+              if (!files || files.length === 0) {
+                const statusUrl = `https://api.alldebrid.com/v4.1/magnet/status?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&id=${magId}`;
+                const statusRes = await makeRequest(statusUrl, { timeout: 7000 });
 
-                  if (selectedFile && selectedFile.l) {
-                    const unlockUrl = `https://api.alldebrid.com/v4/link/unlock?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&link=${encodeURIComponent(selectedFile.l)}`;
-                    const unlockRes = await makeRequest(unlockUrl);
-                    if (unlockRes.data && unlockRes.data.status === 'success') {
-                      return res.json({ success: true, stream: unlockRes.data.data });
-                    }
+                if (statusRes.data && statusRes.data.data && statusRes.data.data.magnets) {
+                  const rawMags = statusRes.data.data.magnets;
+                  const magInfo = Array.isArray(rawMags) ? rawMags[0] : rawMags;
+                  if (magInfo) {
+                    files = magInfo.files || magInfo.links;
+                  }
+                }
+              }
+
+              if (files && files.length > 0) {
+                const selectedFile = isTv 
+                  ? findEpisodeFile(files, season || 1, episode || 1)
+                  : findMovieVideoFile(files);
+
+                const fileLink = selectedFile ? (selectedFile.l || selectedFile.link) : null;
+
+                if (fileLink) {
+                  const unlockUrl = `https://api.alldebrid.com/v4/link/unlock?agent=${AGENT}&apikey=${encodeURIComponent(apikey)}&link=${encodeURIComponent(fileLink)}`;
+                  const unlockRes = await makeRequest(unlockUrl, { timeout: 7000 });
+                  if (unlockRes.data && unlockRes.data.status === 'success') {
+                    console.log(`[smart-resolve] SUCCESS! Unlocked stream for "${title}":`, unlockRes.data.data.link || unlockRes.data.data.download);
+                    return res.json({ success: true, stream: unlockRes.data.data });
                   }
                 }
               }
             }
           }
         }
+      } else {
+        console.log(`[smart-resolve] No streams found from Torrentio mirrors for IMDb ${targetImdb}`);
       }
     } catch (err) {
-      console.error('Error resolviendo magnet para título:', err);
+      console.error('[smart-resolve] Error resolviendo magnet para título:', err);
     }
   }
 
